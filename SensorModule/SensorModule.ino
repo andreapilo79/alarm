@@ -2,7 +2,7 @@
 #include <Wire.h>
 #include <Blinker.h>
 
-/**
+/*
  * system states
  */
 #define STANDBY   0
@@ -11,10 +11,14 @@
 #define DAMAGE    3
 
 /**
- * input/out pins
+ * input pins
  */
 #define SENSOR_PIN 10
 #define ON_OFF_PIN 11
+
+/**
+ * out pins
+ */
 #define LED_PIN 13
 
 /**
@@ -36,7 +40,9 @@ boolean onOffPinOld = true;
 
 Blinker blinker(LED_PIN, 1000, 1000);
 
-
+/*
+ * Send the sensor's state to the bus
+ */
 void onRequest()
 {
 	String sensorState;
@@ -62,21 +68,12 @@ void setup()
 	Wire.onReceive(onReceive);
 
 	pinMode(LED_PIN, OUTPUT);
-	pinMode(ON_OFF_PIN, INPUT_PULLUP);  //Dichiaro il pin 2 come input
-	pinMode(SENSOR_PIN, INPUT_PULLUP);  //Dichiaro il pin 2 come input
+	pinMode(ON_OFF_PIN, INPUT_PULLUP);
+	pinMode(SENSOR_PIN, INPUT_PULLUP);
 
-	Serial.println("System booting on STANDBY");
+	Serial.println("System booting on state: STANDBY");
 }
 
-// TODO make more robust
-boolean isValid(String state)
-{
-	if (state.length() > 0)
-	{
-		return true;
-	}
-	return false;
-}
 
 /**
  * function that executes whenever data is received from master
@@ -116,6 +113,10 @@ void loop()
 
 void handleDamageState()
 {
+	//
+	// Should be read the onoff switch:
+	// if it is ON the next state will be STANDBY
+	//
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin)
 	{
@@ -128,6 +129,11 @@ void handleDamageState()
 
 void handleRunningState()
 {
+	//
+	// Should be read the onoff switch:
+	// if it is OFF the next state will be STANDBY
+	//
+
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin)
 	{
@@ -135,6 +141,11 @@ void handleRunningState()
 		state = STANDBY;
 
 	}
+
+	//
+	// Should be read the onoff switch:
+	// if it is ON the next state will be ALERTING
+	//
 	else if (digitalRead(SENSOR_PIN) == LOW)
 	{
 		Serial.println("RUNNING -> ALERTING");
@@ -147,6 +158,10 @@ void handleRunningState()
 
 void handleStandByState()
 {
+	//
+	// Should be read the on-off switch:
+	// if it is ON the next state will be RUNNING
+	//
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin)
 	{
@@ -159,6 +174,11 @@ void handleStandByState()
 
 void handleAlertingState()
 {
+	//
+	// Should be read the on-off switch:
+	// if it is OFF the next state will be STANDBY
+	//
+
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin)
 	{
