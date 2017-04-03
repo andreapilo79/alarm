@@ -25,7 +25,7 @@ unsigned int STARTING_DELAY = 1000;
 /**
  * Internal state.
  */
-int state = STANDBY;
+State state = STANDBY;
 
 unsigned long int alertingMillis;
 unsigned long startingMillis;
@@ -71,24 +71,25 @@ void setup() {
  */
 void onReceive(int howMany) {
 	if (Wire.available()) {
-		state = Wire.readString().toInt();
+		//state = Wire.readString().toInt();
 	}
 }
 
 void loop() {
 	blinker.update();
+
 	switch (state) {
 	case STANDBY:
-		standByState();
+		standby();
 		break;
 	case RUNNING:
-		runningState();
+		running();
 		break;
 	case ALERTING:
-		alertingState();
+		alerting();
 		break;
 	case DAMAGE:
-		damageState();
+		damage();
 		break;
 	default:
 		Serial.println("Unknown State: " + state);
@@ -97,41 +98,43 @@ void loop() {
 	}
 }
 
-void damageState() {
-	//
-	// Should be read the onoff switch:
-	// if it is ON the next state will be STANDBY
-	//
+void changeState(State s) {
+	Serial.println(state + " -> " + s);
+	state = s;
+}
+
+void damage() {
+//
+// Should be read the onoff switch:
+// if it is ON the next state will be STANDBY
+//
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin) {
-		Serial.println("DAMAGE -> STANDBY");
-		state = STANDBY;
+		changeState(STANDBY);
 	}
 	onOffPinOld = onOffPin;
 	blinker.newDuration(5000, 500);
 }
 
-void runningState() {
-	//
-	// Should be read the onoff switch:
-	// if it is OFF the next state will be STANDBY
-	//
+void running() {
+//
+// Should be read the onoff switch:
+// if it is OFF the next state will be STANDBY
+//
 
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin) {
-		Serial.println("RUNNING -> STANDBY");
-		state = STANDBY;
-
+		changeState(STANDBY);
 	}
 
-	//
-	// Should be read the onoff switch:
-	// if it is ON the next state will be ALERTING
-	//
+//
+// Should be read the onoff switch:
+// if it is ON the next state will be ALERTING
+//
 	else if (digitalRead(SENSOR_PIN) == LOW) {
-		Serial.println("RUNNING -> ALERTING");
-		state = ALERTING;
+		changeState(ALERTING);
 		alertingMillis = millis();
+
 	} else if (millis() - alertingMillis > 1000) {
 		state = RUNNING;
 	}
@@ -139,29 +142,28 @@ void runningState() {
 	blinker.newDuration(2000, 500);
 }
 
-void standByState() {
-	//
-	// Should be read the on-off switch:
-	// if it is ON the next state will be RUNNING
-	//
+void standby() {
+//
+// Should be read the on-off switch:
+// if it is ON the next state will be RUNNING
+//
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin) {
-		Serial.println("STANDBY -> RUNNING");
-		state = RUNNING;
+		changeState(RUNNING);
 	}
 	onOffPinOld = onOffPin;
 	blinker.newDuration(500, 2000);
 }
 
-void alertingState() {
-	//
-	// Should be read the on-off switch:
-	// if it is OFF the next state will be STANDBY
-	//
+void alerting() {
+//
+// Should be read the on-off switch:
+// if it is OFF the next state will be STANDBY
+//
+
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin) {
-		Serial.println("ALERTING -> STANDBY");
-		state = STANDBY;
+		changeState(STANDBY);
 	}
 	onOffPinOld = onOffPin;
 	blinker.newDuration(500, 500);
