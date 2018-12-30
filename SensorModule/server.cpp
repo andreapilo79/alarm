@@ -1,5 +1,21 @@
+/*
+ Copyright (c) 2017 Andrea Pilo.  All right reserved.
+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+
+ You should have received a copy of the GNU Lesser General Public
+ License along with this library; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ */
 #include "Arduino.h"
-#include <Wire.h>
 #include <Blinker.h>
 
 enum State {
@@ -54,10 +70,6 @@ void setup() {
 
 	blinker.begin();
 
-	Wire.begin(1);
-	Wire.onRequest(onRequest);
-	Wire.onReceive(onReceive);
-
 	pinMode(LED_PIN, OUTPUT);
 	pinMode(ON_OFF_PIN, INPUT_PULLUP);
 	pinMode(SENSOR_PIN, INPUT_PULLUP);
@@ -70,9 +82,6 @@ void setup() {
  * this function is registered as an event, see setup()
  */
 void onReceive(int howMany) {
-	if (Wire.available()) {
-		//state = Wire.readString().toInt();
-	}
 }
 
 void loop() {
