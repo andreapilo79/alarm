@@ -16,10 +16,11 @@
  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "Arduino.h"
-#include <Blinker.h>
+
+//#include <Blinker.h>
 
 enum State {
-	STANDBY, ALERTING, RUNNING, DAMAGE
+	DISARMED, ALERTING, ARMED, DAMAGE
 };
 
 /**
@@ -36,75 +37,33 @@ enum State {
 /**
  * Starting delay: the system will be running after that
  */
-unsigned int STARTING_DELAY = 1000;
+unsigned int MAX_ALERTING_TIME = 1000;
+unsigned int MAX_ALERTING_COUNT = 3;
+unsigned int DELAY_TIME = 1000;
 
 /**
  * Internal state.
  */
-State state = STANDBY;
+State state = DISARMED;
 
 unsigned long int alertingMillis;
-unsigned long startingMillis;
-unsigned long runningMillis;
 unsigned int alertCount = 0;
-unsigned int MAX_ALERT = 3;
 boolean onOffPinOld = true;
 
-Blinker blinker(LED_PIN, 1000, 1000);
+boolean isSignaling = false;
 
-/*
- * Send the sensor's state to the bus
- */
-void onRequest() {
-	String sensorState;
-	if (state == ALERTING) {
-		sensorState = "X11111111X";
-	} else {
-		sensorState = "X00000000X";
-	}
-	Wire.print(sensorState);
-}
+//Blinker blinker(LED_PIN, 1000, 1000);
 
 void setup() {
 	Serial.begin(9600);
 
-	blinker.begin();
+	//blinker.begin();
 
 	pinMode(LED_PIN, OUTPUT);
 	pinMode(ON_OFF_PIN, INPUT_PULLUP);
 	pinMode(SENSOR_PIN, INPUT_PULLUP);
 
-	Serial.println("System booting on state: STANDBY");
-}
-
-/**
- * function that executes whenever data is received from master
- * this function is registered as an event, see setup()
- */
-void onReceive(int howMany) {
-}
-
-void loop() {
-	blinker.update();
-
-	switch (state) {
-	case STANDBY:
-		standby();
-		break;
-	case RUNNING:
-		running();
-		break;
-	case ALERTING:
-		alerting();
-		break;
-	case DAMAGE:
-		damage();
-		break;
-	default:
-		Serial.println("Unknown State: " + state);
-		state = DAMAGE;
-		break;
-	}
+	Serial.println("System booting on state: DISARMED");
 }
 
 void changeState(State s) {
@@ -112,68 +71,106 @@ void changeState(State s) {
 	state = s;
 }
 
-void damage() {
-//
-// Should be read the onoff switch:
-// if it is ON the next state will be STANDBY
-//
+/**
+ * This is the system status in case of internal errors
+ *
+ * Should be read the ON_OFF_PIN switch:
+ * if ON the next state will be DISARMED
+ */
+void doDamage() {
+
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin) {
-		changeState(STANDBY);
+		changeState(DISARMED);
 	}
 	onOffPinOld = onOffPin;
-	blinker.newDuration(5000, 500);
+	//blinker.newDuration(5000, 500);
 }
 
-void running() {
-//
-// Should be read the onoff switch:
-// if it is OFF the next state will be STANDBY
-//
+/*
+ * This is the state in which the system must detect intrusions
+ *
+ * Should be read the ON_OFF_PIN:
+ * if OFF the next state is DISARMED
+ *
+ * Should be read the SENSOR_PIN:
+ * if ON the next state is ALERTING
+ */
+void doArmed() {
 
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin) {
-		changeState(STANDBY);
-	}
-
-//
-// Should be read the onoff switch:
-// if it is ON the next state will be ALERTING
-//
-	else if (digitalRead(SENSOR_PIN) == LOW) {
+		changeState(DISARMED);
+	} else if (digitalRead(SENSOR_PIN) == LOW) {
 		changeState(ALERTING);
 		alertingMillis = millis();
-
-	} else if (millis() - alertingMillis > 1000) {
-		state = RUNNING;
 	}
 	onOffPinOld = onOffPin;
-	blinker.newDuration(2000, 500);
+	//blinker.newDuration(2000, 500);
 }
 
-void standby() {
-//
-// Should be read the on-off switch:
-// if it is ON the next state will be RUNNING
-//
+/*
+ * This is the state in which the system is ready to start
+ *
+ * Should be read the ON_OFF_PIN:
+ * if ON the next state is ARMED
+ *
+ * Does not matter the state of SENSOR_PIN
+ */
+void doDisarmed() {
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin) {
-		changeState(RUNNING);
+		changeState(ARMED);
+		alertCount = 0;
 	}
 	onOffPinOld = onOffPin;
-	blinker.newDuration(500, 2000);
+	//blinker.newDuration(500, 2000);
 }
 
-void alerting() {
-//
-// Should be read the on-off switch:
-// if it is OFF the next state will be STANDBY
-//
-
+/**
+ * This is the state in which the system is when happens an intrusion
+ *
+ * Should be read the ON_OFF_PIN:
+ * if OFF the next state is ARMED
+ */
+void doAlerting() {
 	boolean onOffPin = digitalRead(ON_OFF_PIN);
 	if (onOffPinOld && !onOffPin) {
-		changeState(STANDBY);
+		changeState(DISARMED);
+	}
+	else if (millis() - alertingMillis > MAX_ALERTING_TIME) {
+		changeState(ARMED);
+	} else if (alertCount > MAX_ALERTING_COUNT) {
+		changeState(DISARMED);
+	} else if (millis() - alertingMillis > DELAY_TIME) {
+		if (!isSignaling) {
+			isSignaling = true;
+			alertCount++;
+		}
 	}
 	onOffPinOld = onOffPin;
-	blinker.newDuration(500, 500);
+	//blinker.newDuration(500, 500);
+}
+
+void loop() {
+	//blinker.update();
+
+	switch (state) {
+	case DISARMED:
+		doDisarmed();
+		break;
+	case ARMED:
+		doArmed();
+		break;
+	case ALERTING:
+		doAlerting();
+		break;
+	case DAMAGE:
+		doDamage();
+		break;
+	default:
+		Serial.println("Unknown State: " + state);
+		changeState(DAMAGE);
+		break;
+	}
 }
